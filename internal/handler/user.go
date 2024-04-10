@@ -8,8 +8,9 @@ import (
 
 // GetUsers 获取所有用户
 func GetUsers(c *gin.Context) {
+	tenantID := c.Query("tenant_id")
 	var users []model.User
-	result := config.DB.Find(&users)
+	result := config.DB.Where("tenant_id = ?", tenantID).Find(&users)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
@@ -19,12 +20,13 @@ func GetUsers(c *gin.Context) {
 
 // AddUser 添加新的用户
 func AddUser(c *gin.Context) {
+	tenantID := c.Query("tenant_id")
 	var user model.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	result := config.DB.Create(&user)
+	result := config.DB.Where("tenant_id = ?", tenantID).Create(&user)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
@@ -34,13 +36,14 @@ func AddUser(c *gin.Context) {
 
 // UpdateUser 更新用户信息
 func UpdateUser(c *gin.Context) {
+	tenantID := c.Query("tenant_id")
 	var user model.User
 	id := c.Param("id")
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	result := config.DB.Model(&model.User{}).Where("id = ?", id).Updates(user)
+	result := config.DB.Where("tenant_id = ?", tenantID).Model(&model.User{}).Where("id = ?", id).Updates(user)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
@@ -54,8 +57,9 @@ func UpdateUser(c *gin.Context) {
 
 // DeleteUser 删除用户
 func DeleteUser(c *gin.Context) {
+	tenantID := c.Query("tenant_id")
 	id := c.Param("id")
-	result := config.DB.Delete(&model.User{}, id)
+	result := config.DB.Where("tenant_id = ?", tenantID).Delete(&model.User{}, id)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
