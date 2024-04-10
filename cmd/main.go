@@ -22,5 +22,11 @@ func main() {
 	router.PUT("/patrol/:id", handler.UpdatePatrol)
 	router.DELETE("/patrol/:id", handler.DeletePatrol)
 
+	// 注册用户管理的路由
+	router.GET("/users", handler.GetUsers)
+	router.POST("/user", handler.AddUser)
+	router.PUT("/user/:id", handler.UpdateUser)
+	router.DELETE("/user/:id", handler.DeleteUser)
+
 	router.Run() // 默认在8080端口监听
 }
