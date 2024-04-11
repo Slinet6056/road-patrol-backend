@@ -8,4 +8,7 @@ type Patrol struct {
 	InspectorID uint   `json:"inspector_id"`
 	Date        string `json:"date"`
 	Status      string `json:"status"`
+
+	Road      Road `gorm:"foreignKey:RoadID"`
+	Inspector User `gorm:"foreignKey:InspectorID"`
 }
