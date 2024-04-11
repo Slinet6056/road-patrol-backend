@@ -28,5 +28,11 @@ func main() {
 	router.PUT("/user/:id", handler.UpdateUser)
 	router.DELETE("/user/:id", handler.DeleteUser)
 
+	// 注册巡检报告的路由
+	router.GET("/reports", handler.GetReports)
+	router.POST("/report", handler.AddReport)
+	router.PUT("/report/:id", handler.UpdateReport)
+	router.DELETE("/report/:id", handler.DeleteReport)
+
 	router.Run() // 默认在8080端口监听
 }
