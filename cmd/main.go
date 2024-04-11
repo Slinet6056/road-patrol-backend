@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Slinet6056/road-patrol-backend/internal/config"
 	"github.com/Slinet6056/road-patrol-backend/internal/handler"
+	"github.com/Slinet6056/road-patrol-backend/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,29 +11,37 @@ func main() {
 	config.InitDB() // 初始化数据库连接
 	router := gin.Default()
 
-	// 注册道路的路由
-	router.GET("/roads", handler.GetRoads)
-	router.POST("/road", handler.AddRoad)
-	router.PUT("/road/:id", handler.UpdateRoad)
-	router.DELETE("/road/:id", handler.DeleteRoad)
+	// 注册登录路由
+	router.POST("/login", handler.Login)
 
-	// 注册巡检任务的路由
-	router.GET("/patrols", handler.GetPatrols)
-	router.POST("/patrol", handler.AddPatrol)
-	router.PUT("/patrol/:id", handler.UpdatePatrol)
-	router.DELETE("/patrol/:id", handler.DeletePatrol)
+	authorizedAdmin := router.Group("/")
+	authorizedAdmin.Use(middleware.JWTAuth([]string{"admin"}))
+	{
+		authorizedAdmin.POST("/road", handler.AddRoad)
+		authorizedAdmin.PUT("/road/:id", handler.UpdateRoad)
+		authorizedAdmin.DELETE("/road/:id", handler.DeleteRoad)
 
-	// 注册用户管理的路由
-	router.GET("/users", handler.GetUsers)
-	router.POST("/user", handler.AddUser)
-	router.PUT("/user/:id", handler.UpdateUser)
-	router.DELETE("/user/:id", handler.DeleteUser)
+		authorizedAdmin.GET("/users", handler.GetUsers)
+		authorizedAdmin.POST("/user", handler.AddUser)
+		authorizedAdmin.PUT("/user/:id", handler.UpdateUser)
+		authorizedAdmin.DELETE("/user/:id", handler.DeleteUser)
+	}
 
-	// 注册巡检报告的路由
-	router.GET("/reports", handler.GetReports)
-	router.POST("/report", handler.AddReport)
-	router.PUT("/report/:id", handler.UpdateReport)
-	router.DELETE("/report/:id", handler.DeleteReport)
+	authorizedInspector := router.Group("/")
+	authorizedInspector.Use(middleware.JWTAuth([]string{"admin", "inspector"}))
+	{
+		authorizedInspector.GET("/roads", handler.GetRoads)
+
+		authorizedInspector.GET("/patrols", handler.GetPatrols)
+		authorizedInspector.POST("/patrol", handler.AddPatrol)
+		authorizedInspector.PUT("/patrol/:id", handler.UpdatePatrol)
+		authorizedInspector.DELETE("/patrol/:id", handler.DeletePatrol)
+
+		authorizedInspector.GET("/reports", handler.GetReports)
+		authorizedInspector.POST("/report", handler.AddReport)
+		authorizedInspector.PUT("/report/:id", handler.UpdateReport)
+		authorizedInspector.DELETE("/report/:id", handler.DeleteReport)
+	}
 
 	router.Run() // 默认在8080端口监听
 }
