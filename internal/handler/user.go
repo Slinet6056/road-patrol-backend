@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strconv"
+
 	"github.com/Slinet6056/road-patrol-backend/internal/config"
 	"github.com/Slinet6056/road-patrol-backend/internal/model"
 	"github.com/gin-gonic/gin"
@@ -26,6 +28,8 @@ func AddUser(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
+	user.TenantID = uint(parsedTenantID)
 	result := config.DB.Where("tenant_id = ?", tenantID).Create(&user)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
@@ -43,6 +47,8 @@ func UpdateUser(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
+	user.TenantID = uint(parsedTenantID)
 	result := config.DB.Where("tenant_id = ?", tenantID).Model(&model.User{}).Where("id = ?", id).Updates(user)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
