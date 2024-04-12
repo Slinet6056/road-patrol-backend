@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Slinet6056/road-patrol-backend/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -19,8 +20,7 @@ func JWTAuth(requiredRoles []string) gin.HandlerFunc {
 
 		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 		token, err := jwt.ParseWithClaims(tokenString, &jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-			// TODO: 不使用固定密钥，改为从配置文件中读取
-			return []byte("%YU3#oZvc*e%23vN"), nil
+			return []byte(config.JWTSecret), nil
 		})
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Error parsing token", "details": err.Error()})

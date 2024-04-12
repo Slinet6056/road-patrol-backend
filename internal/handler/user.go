@@ -37,8 +37,7 @@ func Login(c *gin.Context) {
 		"exp":      time.Now().Add(time.Hour * 72).Unix(),
 	})
 
-	// TODO: 不使用固定密钥，改为从配置文件中读取
-	tokenString, err := token.SignedString([]byte("%YU3#oZvc*e%23vN"))
+	tokenString, err := token.SignedString([]byte(config.JWTSecret))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
 		return

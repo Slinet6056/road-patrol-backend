@@ -8,7 +8,10 @@ import (
 )
 
 func main() {
-	config.InitDB() // 初始化数据库连接
+	config.InitConfig() // 初始化配置
+	config.InitDB()     // 初始化数据库连接
+
+	gin.SetMode(config.GinMode)
 	router := gin.Default()
 
 	// 注册登录路由
@@ -43,5 +46,5 @@ func main() {
 		authorizedInspector.DELETE("/report/:id", handler.DeleteReport)
 	}
 
-	router.Run() // 默认在8080端口监听
+	router.Run(":" + config.GinPort)
 }

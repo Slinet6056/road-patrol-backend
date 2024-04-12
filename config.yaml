@@ -1,0 +1,9 @@
+jwt_secret: "%YU3#oZvc*e%23vN"
+database:
+  username: "rpUser"
+  password: "RoadPatrolUser"
+  host: "127.0.0.1"
+  port: "3306"
+gin:
+  mode: "debug" # debug, release, test
+  port: "8888"
