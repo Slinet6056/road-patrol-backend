@@ -49,5 +49,8 @@ func InitDB() {
 		panic("failed to connect to road_patrol database")
 	}
 
-	DB.AutoMigrate(&model.Road{}, &model.User{}, &model.Patrol{}, &model.Report{})
+	err = DB.AutoMigrate(&model.Road{}, &model.User{}, &model.Patrol{}, &model.Report{})
+	if err != nil {
+		panic("failed to auto migrate database")
+	}
 }

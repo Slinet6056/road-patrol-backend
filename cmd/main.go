@@ -46,5 +46,8 @@ func main() {
 		authorizedInspector.DELETE("/report/:id", handler.DeleteReport)
 	}
 
-	router.Run(":" + config.GinPort)
+	err := router.Run(":" + config.GinPort)
+	if err != nil {
+		return
+	}
 }
