@@ -17,6 +17,9 @@ func main() {
 	// 注册登录路由
 	router.POST("/login", handler.Login)
 
+	// 注册刷新令牌路由
+	router.POST("/refresh-token", handler.RefreshToken)
+
 	authorizedAdmin := router.Group("/")
 	authorizedAdmin.Use(middleware.JWTAuth([]string{"admin"}))
 	{

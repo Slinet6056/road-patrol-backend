@@ -37,13 +37,64 @@ func Login(c *gin.Context) {
 		"exp":      time.Now().Add(time.Hour * 72).Unix(),
 	})
 
+	// 生成刷新令牌
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": user.Username,
+		"exp":      time.Now().Add(time.Hour * 168).Unix(), // 刷新令牌有效期为一周
+	})
+	refreshTokenString, _ := refreshToken.SignedString([]byte(config.JWTSecret))
+
 	tokenString, err := token.SignedString([]byte(config.JWTSecret))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"username":     user.Username,
+			"roles":        []string{user.Role},
+			"accessToken":  tokenString,
+			"refreshToken": refreshTokenString,
+			"expires":      time.Now().Add(time.Hour * 72).Unix(),
+		},
+	})
+}
+
+// RefreshToken 刷新令牌
+func RefreshToken(c *gin.Context) {
+	var tokenParams struct {
+		RefreshToken string `json:"refreshToken"`
+	}
+	if err := c.ShouldBindJSON(&tokenParams); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 解析刷新令牌
+	token, _ := jwt.Parse(tokenParams.RefreshToken, func(token *jwt.Token) (interface{}, error) {
+		return []byte(config.JWTSecret), nil
+	})
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"username": claims["username"],
+			"exp":      time.Now().Add(time.Hour * 72).Unix(),
+		})
+		newTokenString, _ := newToken.SignedString([]byte(config.JWTSecret))
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": gin.H{
+				"accessToken":  newTokenString,
+				"refreshToken": tokenParams.RefreshToken, // 保持原刷新令牌
+				"expires":      time.Now().Add(time.Hour * 72).Unix(),
+			},
+		})
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired refresh token"})
+	}
 }
 
 // GetUsers 获取所有用户
