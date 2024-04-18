@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/Slinet6056/road-patrol-backend/pkg/logger"
 	"net/http"
 	"strconv"
 	"time"
@@ -21,6 +22,9 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 打印登录用户的用户名与密码
+	logger.Debug("user logged in, username: ", loginParams.Username, ", password: ", loginParams.Password)
 
 	// 验证用户名和密码
 	var user model.User

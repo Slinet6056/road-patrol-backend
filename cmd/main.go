@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Slinet6056/road-patrol-backend/internal/config"
 	"github.com/Slinet6056/road-patrol-backend/internal/handler"
+	"github.com/Slinet6056/road-patrol-backend/pkg/logger"
 	"github.com/Slinet6056/road-patrol-backend/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -10,6 +11,10 @@ import (
 func main() {
 	config.InitConfig() // 初始化配置
 	config.InitDB()     // 初始化数据库连接
+	err := logger.Init()
+	if err != nil {
+		return
+	}
 
 	gin.SetMode(config.GinMode)
 	router := gin.Default()
@@ -49,7 +54,7 @@ func main() {
 		authorizedInspector.DELETE("/report/:id", handler.DeleteReport)
 	}
 
-	err := router.Run(":" + config.GinPort)
+	err = router.Run(":" + config.GinPort)
 	if err != nil {
 		return
 	}
