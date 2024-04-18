@@ -33,16 +33,17 @@ func Login(c *gin.Context) {
 	}
 
 	// 生成JWT令牌
+	exp := time.Now().Add(time.Hour * 24)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": user.Username,
 		"role":     user.Role,
-		"exp":      time.Now().Add(time.Hour * 24).Format("2006/01/02 15:04:05"),
+		"exp":      exp.Unix(),
 	})
 
 	// 生成刷新令牌
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": user.Username,
-		"exp":      time.Now().Add(time.Hour * 168).Format("2006/01/02 15:04:05"),
+		"exp":      time.Now().Add(time.Hour * 168).Unix(),
 	})
 	refreshTokenString, _ := refreshToken.SignedString([]byte(config.JWTSecret))
 
@@ -60,7 +61,7 @@ func Login(c *gin.Context) {
 			"roles":        []string{user.Role},
 			"accessToken":  tokenString,
 			"refreshToken": refreshTokenString,
-			"expires":      time.Now().Add(time.Hour * 24).Format("2006/01/02 15:04:05"),
+			"expires":      exp.Format("2006/01/02 15:04:05"),
 		},
 	})
 }
@@ -82,9 +83,10 @@ func RefreshToken(c *gin.Context) {
 	})
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		exp := time.Now().Add(time.Hour * 168)
 		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"username": claims["username"],
-			"exp":      time.Now().Add(time.Hour * 168).Format("2006/01/02 15:04:05"),
+			"exp":      exp.Unix(),
 		})
 		newTokenString, _ := newToken.SignedString([]byte(config.JWTSecret))
 
@@ -93,7 +95,7 @@ func RefreshToken(c *gin.Context) {
 			"data": gin.H{
 				"accessToken":  newTokenString,
 				"refreshToken": tokenParams.RefreshToken, // 保持原刷新令牌
-				"expires":      time.Now().Add(time.Hour * 168).Format("2006/01/02 15:04:05"),
+				"expires":      exp.Format("2006/01/02 15:04:05"),
 			},
 		})
 	} else {
