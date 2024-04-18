@@ -19,18 +19,16 @@ func Login(c *gin.Context) {
 		Password string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&loginParams); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "服务器错误"})
+		logger.Error(err.Error())
 		return
 	}
-
-	// 打印登录用户的用户名与密码
-	logger.Debug("user logged in, username: ", loginParams.Username, ", password: ", loginParams.Password)
 
 	// 验证用户名和密码
 	var user model.User
 	result := config.DB.Where("username = ? AND password = ?", loginParams.Username, loginParams.Password).First(&user)
 	if result.Error != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "用户名或密码错误"})
 		return
 	}
 
@@ -38,19 +36,20 @@ func Login(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": user.Username,
 		"role":     user.Role,
-		"exp":      time.Now().Add(time.Hour * 72).Unix(),
+		"exp":      time.Now().Add(time.Hour * 24).Format("2006/01/02 15:04:05"),
 	})
 
 	// 生成刷新令牌
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": user.Username,
-		"exp":      time.Now().Add(time.Hour * 168).Unix(), // 刷新令牌有效期为一周
+		"exp":      time.Now().Add(time.Hour * 168).Format("2006/01/02 15:04:05"),
 	})
 	refreshTokenString, _ := refreshToken.SignedString([]byte(config.JWTSecret))
 
 	tokenString, err := token.SignedString([]byte(config.JWTSecret))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		logger.Error("Could not generate token")
 		return
 	}
 
@@ -61,7 +60,7 @@ func Login(c *gin.Context) {
 			"roles":        []string{user.Role},
 			"accessToken":  tokenString,
 			"refreshToken": refreshTokenString,
-			"expires":      time.Now().Add(time.Hour * 72).Unix(),
+			"expires":      time.Now().Add(time.Hour * 24).Format("2006/01/02 15:04:05"),
 		},
 	})
 }
@@ -72,7 +71,8 @@ func RefreshToken(c *gin.Context) {
 		RefreshToken string `json:"refreshToken"`
 	}
 	if err := c.ShouldBindJSON(&tokenParams); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "服务器错误"})
+		logger.Error(err.Error())
 		return
 	}
 
@@ -84,7 +84,7 @@ func RefreshToken(c *gin.Context) {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"username": claims["username"],
-			"exp":      time.Now().Add(time.Hour * 72).Unix(),
+			"exp":      time.Now().Add(time.Hour * 168).Format("2006/01/02 15:04:05"),
 		})
 		newTokenString, _ := newToken.SignedString([]byte(config.JWTSecret))
 
@@ -93,11 +93,11 @@ func RefreshToken(c *gin.Context) {
 			"data": gin.H{
 				"accessToken":  newTokenString,
 				"refreshToken": tokenParams.RefreshToken, // 保持原刷新令牌
-				"expires":      time.Now().Add(time.Hour * 72).Unix(),
+				"expires":      time.Now().Add(time.Hour * 168).Format("2006/01/02 15:04:05"),
 			},
 		})
 	} else {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired refresh token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Invalid or expired refresh token"})
 	}
 }
 
