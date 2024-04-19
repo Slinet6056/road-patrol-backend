@@ -13,7 +13,7 @@ func JWTAuth(requiredRoles []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString := c.GetHeader("Authorization")
 		if tokenString == "" || !strings.HasPrefix(tokenString, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
+			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Authorization header is required"})
 			c.Abort()
 			return
 		}
@@ -23,21 +23,26 @@ func JWTAuth(requiredRoles []string) gin.HandlerFunc {
 			return []byte(config.JWTSecret), nil
 		})
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Error parsing token", "details": err.Error()})
+			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Error parsing token", "details": err.Error()})
 			c.Abort()
 			return
 		}
 
 		if claims, ok := token.Claims.(*jwt.MapClaims); ok && token.Valid {
-			role := (*claims)["role"].(string)
-			if !contains(requiredRoles, role) {
-				c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions", "required_roles": requiredRoles, "token_role": role})
+			if role, ok := (*claims)["role"].(string); ok {
+				if !contains(requiredRoles, role) {
+					c.JSON(http.StatusForbidden, gin.H{"success": false, "message": "Insufficient permissions", "required_roles": requiredRoles, "token_role": role})
+					c.Abort()
+					return
+				}
+				c.Next()
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Role claim must be a non-empty string"})
 				c.Abort()
 				return
 			}
-			c.Next()
 		} else {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Invalid token"})
 			c.Abort()
 			return
 		}

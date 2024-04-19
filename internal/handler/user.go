@@ -33,7 +33,7 @@ func Login(c *gin.Context) {
 	}
 
 	// 生成JWT令牌
-	exp := time.Now().Add(time.Hour * 24)
+	exp := time.Now().Add(time.Hour * 2)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": user.Username,
 		"role":     user.Role,
@@ -43,7 +43,8 @@ func Login(c *gin.Context) {
 	// 生成刷新令牌
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": user.Username,
-		"exp":      time.Now().Add(time.Hour * 168).Unix(),
+		"role":     user.Role,
+		"exp":      time.Now().Add(time.Hour * 24 * 30).Unix(),
 	})
 	refreshTokenString, _ := refreshToken.SignedString([]byte(config.JWTSecret))
 
@@ -72,29 +73,39 @@ func RefreshToken(c *gin.Context) {
 		RefreshToken string `json:"refreshToken"`
 	}
 	if err := c.ShouldBindJSON(&tokenParams); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "服务器错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": err.Error()})
 		logger.Error(err.Error())
 		return
 	}
 
 	// 解析刷新令牌
-	token, _ := jwt.Parse(tokenParams.RefreshToken, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenParams.RefreshToken, func(token *jwt.Token) (interface{}, error) {
 		return []byte(config.JWTSecret), nil
 	})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Invalid or expired refresh token"})
+		return
+	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		exp := time.Now().Add(time.Hour * 168)
+		exp := time.Now().Add(time.Hour * 2)
 		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"username": claims["username"],
+			"role":     claims["role"],
 			"exp":      exp.Unix(),
 		})
-		newTokenString, _ := newToken.SignedString([]byte(config.JWTSecret))
+		newTokenString, err := newToken.SignedString([]byte(config.JWTSecret))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Could not generate token"})
+			logger.Error("Could not generate token")
+			return
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
 				"accessToken":  newTokenString,
-				"refreshToken": tokenParams.RefreshToken, // 保持原刷新令牌
+				"refreshToken": tokenParams.RefreshToken,
 				"expires":      exp.Format("2006/01/02 15:04:05"),
 			},
 		})
