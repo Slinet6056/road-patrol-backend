@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"gorm.io/gorm"
 	"strconv"
 
 	"github.com/Slinet6056/road-patrol-backend/internal/config"
@@ -35,7 +37,9 @@ func AddRoad(c *gin.Context) {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
 	}
-	c.JSON(201, road)
+	var createdRoad model.Road
+	config.DB.Where("id = ?", road.ID).First(&createdRoad)
+	c.JSON(201, createdRoad)
 }
 
 // UpdateRoad 更新道路信息
@@ -49,16 +53,28 @@ func UpdateRoad(c *gin.Context) {
 	}
 	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
 	road.TenantID = uint(parsedTenantID)
-	result := config.DB.Where("tenant_id = ?", tenantID).Model(&model.Road{}).Where("id = ?", id).Updates(road)
+	var existingRoad model.Road
+	result := config.DB.Where("tenant_id = ? AND id = ?", tenantID, id).First(&existingRoad)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			c.JSON(404, gin.H{"error": "No road found with given ID"})
+		} else {
+			c.JSON(500, gin.H{"error": result.Error.Error()})
+		}
+		return
+	}
+	result = config.DB.Where("tenant_id = ?", tenantID).Model(&model.Road{}).Where("id = ?", id).Updates(road)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(404, gin.H{"error": "No road found with given ID"})
-		return
+		c.JSON(200, gin.H{"message": "No fields updated", "road": existingRoad})
+	} else {
+		var updatedRoad model.Road
+		config.DB.Where("id = ?", id).First(&updatedRoad)
+		c.JSON(200, updatedRoad)
 	}
-	c.JSON(200, road)
 }
 
 // DeleteRoad 删除道路信息
