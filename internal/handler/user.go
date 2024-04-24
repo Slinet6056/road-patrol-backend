@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"errors"
 	"github.com/Slinet6056/road-patrol-backend/pkg/logger"
+	"gorm.io/gorm"
 	"net/http"
 	"strconv"
 	"time"
@@ -141,6 +143,8 @@ func AddUser(c *gin.Context) {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
 	}
+	var createdUser model.User
+	config.DB.Where("id = ?", user.ID).First(&createdUser)
 	c.JSON(201, user)
 }
 
@@ -155,16 +159,28 @@ func UpdateUser(c *gin.Context) {
 	}
 	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
 	user.TenantID = uint(parsedTenantID)
-	result := config.DB.Where("tenant_id = ?", tenantID).Model(&model.User{}).Where("id = ?", id).Updates(user)
+	var existingUser model.User
+	result := config.DB.Where("tenant_id = ? AND id = ?", tenantID, id).First(&existingUser)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			c.JSON(404, gin.H{"error": "No user found with given ID"})
+		} else {
+			c.JSON(500, gin.H{"error": result.Error.Error()})
+		}
+		return
+	}
+	result = config.DB.Where("tenant_id = ?", tenantID).Model(&model.User{}).Where("id = ?", id).Updates(user)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(404, gin.H{"error": "No user found with given ID"})
-		return
+		c.JSON(200, gin.H{"message": "No changes made"})
+	} else {
+		var updatedUser model.User
+		config.DB.Where("id = ?", id).First(&updatedUser)
+		c.JSON(200, updatedUser)
 	}
-	c.JSON(200, user)
 }
 
 // DeleteUser 删除用户
