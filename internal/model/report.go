@@ -6,9 +6,9 @@ import "time"
 type Report struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	TenantID  uint      `json:"tenant_id"`
-	PatrolID  uint      `json:"patrol_id"`
+	PlanID    uint      `json:"plan_id"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 
-	Patrol Patrol `gorm:"foreignKey:PatrolID"`
+	Plan Plan `gorm:"foreignKey:PlanID"`
 }

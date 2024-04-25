@@ -57,7 +57,7 @@ func InitDB() {
 	}
 
 	DbMutex.Lock()
-	err = DB.AutoMigrate(&model.Road{}, &model.User{}, &model.Patrol{}, &model.Report{})
+	err = DB.AutoMigrate(&model.Road{}, &model.User{}, &model.Plan{}, &model.Report{}, &model.PlanRoad{})
 	DbMutex.Unlock()
 	if err != nil {
 		panic("failed to auto migrate database")

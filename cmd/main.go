@@ -43,10 +43,10 @@ func main() {
 	{
 		authorizedInspector.GET("/roads", handler.GetRoads)
 
-		authorizedInspector.GET("/patrols", handler.GetPatrols)
-		authorizedInspector.POST("/patrol", handler.AddPatrol)
-		authorizedInspector.PUT("/patrol/:id", handler.UpdatePatrol)
-		authorizedInspector.DELETE("/patrol/:id", handler.DeletePatrol)
+		authorizedInspector.GET("/plans", handler.GetPlans)
+		authorizedInspector.POST("/plan", handler.AddPlan)
+		authorizedInspector.PUT("/plan/:id", handler.UpdatePlan)
+		authorizedInspector.DELETE("/plan/:id", handler.DeletePlan)
 
 		authorizedInspector.GET("/reports", handler.GetReports)
 		authorizedInspector.POST("/report", handler.AddReport)
