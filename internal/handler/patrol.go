@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"gorm.io/gorm"
 	"strconv"
 
 	"github.com/Slinet6056/road-patrol-backend/internal/config"
@@ -35,7 +37,9 @@ func AddPatrol(c *gin.Context) {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
 	}
-	c.JSON(201, patrol)
+	var createdPatrol model.Patrol
+	config.DB.Where("id = ?", patrol.ID).First(&createdPatrol)
+	c.JSON(201, createdPatrol)
 }
 
 // UpdatePatrol 更新巡检任务
@@ -49,16 +53,28 @@ func UpdatePatrol(c *gin.Context) {
 	}
 	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
 	patrol.TenantID = uint(parsedTenantID)
-	result := config.DB.Where("tenant_id = ?", tenantID).Model(&model.Patrol{}).Where("id = ?", id).Updates(patrol)
+	var existingPatrol model.Patrol
+	result := config.DB.Where("tenant_id = ? AND id = ?", tenantID, id).First(&existingPatrol)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			c.JSON(404, gin.H{"error": "No patrol found with given ID"})
+		} else {
+			c.JSON(500, gin.H{"error": result.Error.Error()})
+		}
+		return
+	}
+	result = config.DB.Where("tenant_id = ?", tenantID).Model(&model.Patrol{}).Where("id = ?", id).Updates(patrol)
 	if result.Error != nil {
 		c.JSON(500, gin.H{"error": result.Error.Error()})
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(404, gin.H{"error": "No patrol found with given ID"})
-		return
+		c.JSON(200, gin.H{"message": "No patrol updated"})
+	} else {
+		var updatedPatrol model.Patrol
+		config.DB.Where("id = ?", id).First(&updatedPatrol)
+		c.JSON(200, updatedPatrol)
 	}
-	c.JSON(200, patrol)
 }
 
 // DeletePatrol 删除巡检任务
