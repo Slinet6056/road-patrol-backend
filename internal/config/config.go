@@ -1,16 +1,21 @@
 package config
 
 import (
+	"sync"
+
 	"github.com/Slinet6056/road-patrol-backend/internal/model"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
-var JWTSecret string
-var GinPort string
-var GinMode string
+var (
+	DB        *gorm.DB
+	JWTSecret string
+	GinPort   string
+	GinMode   string
+	DbMutex   sync.Mutex
+)
 
 func InitConfig() {
 	viper.SetConfigName("config")
@@ -39,8 +44,10 @@ func InitDB() {
 	}
 
 	// 创建数据库
+	DbMutex.Lock()
 	DB.Exec("CREATE DATABASE IF NOT EXISTS road_patrol")
 	DB.Exec("USE road_patrol")
+	DbMutex.Unlock()
 
 	// 连接到具体的数据库
 	dsn = username + ":" + password + "@tcp(" + host + ":" + port + ")/road_patrol?charset=utf8mb4&parseTime=True&loc=Local"
@@ -49,7 +56,9 @@ func InitDB() {
 		panic("failed to connect to road_patrol database")
 	}
 
+	DbMutex.Lock()
 	err = DB.AutoMigrate(&model.Road{}, &model.User{}, &model.Patrol{}, &model.Report{})
+	DbMutex.Unlock()
 	if err != nil {
 		panic("failed to auto migrate database")
 	}

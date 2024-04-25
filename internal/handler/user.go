@@ -2,16 +2,16 @@ package handler
 
 import (
 	"errors"
-	"github.com/Slinet6056/road-patrol-backend/pkg/logger"
-	"gorm.io/gorm"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/Slinet6056/road-patrol-backend/internal/config"
 	"github.com/Slinet6056/road-patrol-backend/internal/model"
+	"github.com/Slinet6056/road-patrol-backend/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 // Login 用户登录
@@ -26,47 +26,58 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 验证用户名和密码
-	var user model.User
-	result := config.DB.Where("username = ? AND password = ?", loginParams.Username, loginParams.Password).First(&user)
-	if result.Error != nil {
+	userChan := make(chan model.User)
+	errChan := make(chan error)
+
+	go func() {
+		var user model.User
+		config.DbMutex.Lock()
+		result := config.DB.Where("username = ? AND password = ?", loginParams.Username, loginParams.Password).First(&user)
+		config.DbMutex.Unlock()
+		if result.Error != nil {
+			errChan <- result.Error
+			return
+		}
+		userChan <- user
+	}()
+
+	select {
+	case user := <-userChan:
+		exp := time.Now().Add(time.Hour * 2)
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"username": user.Username,
+			"role":     user.Role,
+			"exp":      exp.Unix(),
+		})
+
+		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"username": user.Username,
+			"role":     user.Role,
+			"exp":      time.Now().Add(time.Hour * 24 * 30).Unix(),
+		})
+		refreshTokenString, _ := refreshToken.SignedString([]byte(config.JWTSecret))
+
+		tokenString, err := token.SignedString([]byte(config.JWTSecret))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+			logger.Error("Could not generate token")
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": gin.H{
+				"username":     user.Username,
+				"roles":        []string{user.Role},
+				"accessToken":  tokenString,
+				"refreshToken": refreshTokenString,
+				"expires":      exp.Format("2006/01/02 15:04:05"),
+			},
+		})
+	case err := <-errChan:
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "用户名或密码错误"})
-		return
+		logger.Error(err.Error())
 	}
-
-	// 生成JWT令牌
-	exp := time.Now().Add(time.Hour * 2)
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"username": user.Username,
-		"role":     user.Role,
-		"exp":      exp.Unix(),
-	})
-
-	// 生成刷新令牌
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"username": user.Username,
-		"role":     user.Role,
-		"exp":      time.Now().Add(time.Hour * 24 * 30).Unix(),
-	})
-	refreshTokenString, _ := refreshToken.SignedString([]byte(config.JWTSecret))
-
-	tokenString, err := token.SignedString([]byte(config.JWTSecret))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
-		logger.Error("Could not generate token")
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"username":     user.Username,
-			"roles":        []string{user.Role},
-			"accessToken":  tokenString,
-			"refreshToken": refreshTokenString,
-			"expires":      exp.Format("2006/01/02 15:04:05"),
-		},
-	})
 }
 
 // RefreshToken 刷新令牌
@@ -80,7 +91,6 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	// 解析刷新令牌
 	token, err := jwt.Parse(tokenParams.RefreshToken, func(token *jwt.Token) (interface{}, error) {
 		return []byte(config.JWTSecret), nil
 	})
@@ -119,13 +129,28 @@ func RefreshToken(c *gin.Context) {
 // GetUsers 获取所有用户
 func GetUsers(c *gin.Context) {
 	tenantID := c.Query("tenant_id")
-	var users []model.User
-	result := config.DB.Where("tenant_id = ?", tenantID).Find(&users)
-	if result.Error != nil {
-		c.JSON(500, gin.H{"error": result.Error.Error()})
-		return
+
+	usersChan := make(chan []model.User)
+	errChan := make(chan error)
+
+	go func() {
+		var users []model.User
+		config.DbMutex.Lock()
+		result := config.DB.Where("tenant_id = ?", tenantID).Find(&users)
+		config.DbMutex.Unlock()
+		if result.Error != nil {
+			errChan <- result.Error
+			return
+		}
+		usersChan <- users
+	}()
+
+	select {
+	case users := <-usersChan:
+		c.JSON(200, users)
+	case err := <-errChan:
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-	c.JSON(200, users)
 }
 
 // AddUser 添加新的用户
@@ -138,14 +163,31 @@ func AddUser(c *gin.Context) {
 	}
 	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
 	user.TenantID = uint(parsedTenantID)
-	result := config.DB.Where("tenant_id = ?", tenantID).Create(&user)
-	if result.Error != nil {
-		c.JSON(500, gin.H{"error": result.Error.Error()})
-		return
+
+	userChan := make(chan model.User)
+	errChan := make(chan error)
+
+	go func() {
+		config.DbMutex.Lock()
+		result := config.DB.Where("tenant_id = ?", tenantID).Create(&user)
+		config.DbMutex.Unlock()
+		if result.Error != nil {
+			errChan <- result.Error
+			return
+		}
+		var createdUser model.User
+		config.DbMutex.Lock()
+		config.DB.Where("id = ?", user.ID).First(&createdUser)
+		config.DbMutex.Unlock()
+		userChan <- createdUser
+	}()
+
+	select {
+	case createdUser := <-userChan:
+		c.JSON(201, createdUser)
+	case err := <-errChan:
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-	var createdUser model.User
-	config.DB.Where("id = ?", user.ID).First(&createdUser)
-	c.JSON(201, user)
 }
 
 // UpdateUser 更新用户信息
@@ -159,27 +201,54 @@ func UpdateUser(c *gin.Context) {
 	}
 	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
 	user.TenantID = uint(parsedTenantID)
-	var existingUser model.User
-	result := config.DB.Where("tenant_id = ? AND id = ?", tenantID, id).First(&existingUser)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			c.JSON(404, gin.H{"error": "No user found with given ID"})
-		} else {
-			c.JSON(500, gin.H{"error": result.Error.Error()})
+
+	userChan := make(chan model.User)
+	errChan := make(chan error)
+
+	go func() {
+		var existingUser model.User
+		config.DbMutex.Lock()
+		result := config.DB.Where("tenant_id = ? AND id = ?", tenantID, id).First(&existingUser)
+		config.DbMutex.Unlock()
+		if result.Error != nil {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				errChan <- errors.New("no user found with given ID")
+			} else {
+				errChan <- result.Error
+			}
+			return
 		}
-		return
-	}
-	result = config.DB.Where("tenant_id = ?", tenantID).Model(&model.User{}).Where("id = ?", id).Updates(user)
-	if result.Error != nil {
-		c.JSON(500, gin.H{"error": result.Error.Error()})
-		return
-	}
-	if result.RowsAffected == 0 {
-		c.JSON(200, gin.H{"message": "No changes made"})
-	} else {
-		var updatedUser model.User
-		config.DB.Where("id = ?", id).First(&updatedUser)
-		c.JSON(200, updatedUser)
+		config.DbMutex.Lock()
+		result = config.DB.Where("tenant_id = ?", tenantID).Model(&model.User{}).Where("id = ?", id).Updates(user)
+		config.DbMutex.Unlock()
+		if result.Error != nil {
+			errChan <- result.Error
+			return
+		}
+		if result.RowsAffected == 0 {
+			userChan <- existingUser
+		} else {
+			var updatedUser model.User
+			config.DbMutex.Lock()
+			config.DB.Where("id = ?", id).First(&updatedUser)
+			config.DbMutex.Unlock()
+			userChan <- updatedUser
+		}
+	}()
+
+	select {
+	case user := <-userChan:
+		if user.ID == 0 {
+			c.JSON(200, gin.H{"message": "No changes made"})
+		} else {
+			c.JSON(200, user)
+		}
+	case err := <-errChan:
+		if err.Error() == "no user found with given ID" {
+			c.JSON(404, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(500, gin.H{"error": err.Error()})
+		}
 	}
 }
 
@@ -187,14 +256,20 @@ func UpdateUser(c *gin.Context) {
 func DeleteUser(c *gin.Context) {
 	tenantID := c.Query("tenant_id")
 	id := c.Param("id")
-	result := config.DB.Where("tenant_id = ?", tenantID).Delete(&model.User{}, id)
-	if result.Error != nil {
-		c.JSON(500, gin.H{"error": result.Error.Error()})
+
+	resultChan := make(chan error)
+
+	go func() {
+		config.DbMutex.Lock()
+		result := config.DB.Where("tenant_id = ?", tenantID).Delete(&model.User{}, id)
+		config.DbMutex.Unlock()
+		resultChan <- result.Error
+	}()
+
+	if err := <-resultChan; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	if result.RowsAffected == 0 {
-		c.JSON(404, gin.H{"error": "No user found with given ID"})
-		return
-	}
+
 	c.JSON(200, gin.H{"message": "User deleted"})
 }
