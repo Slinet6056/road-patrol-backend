@@ -73,7 +73,11 @@ func GetPlans(c *gin.Context) {
 
 	select {
 	case planDetails := <-planDetailChan:
-		c.JSON(200, planDetails)
+		if len(planDetails) == 0 {
+			c.JSON(200, []PlanDetail{})
+		} else {
+			c.JSON(200, planDetails)
+		}
 	case err := <-errChan:
 		c.JSON(500, gin.H{"error": err.Error()})
 	}
