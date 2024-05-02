@@ -24,9 +24,13 @@ type PlanDetailJSON struct {
 }
 
 func (p *PlanDetailJSON) ToPlanDetail() (PlanDetail, error) {
-	date, err := time.Parse("2006-01-02", p.Date)
-	if err != nil {
-		return PlanDetail{}, err
+	var date time.Time
+	if p.Date != "" {
+		parsedDate, err := time.Parse("2006-01-02", p.Date)
+		if err != nil {
+			return PlanDetail{}, err
+		}
+		date = parsedDate
 	}
 
 	return PlanDetail{
