@@ -86,12 +86,17 @@ func GetPlans(c *gin.Context) {
 // AddPlan 添加新的巡检任务及其关联的道路
 func AddPlan(c *gin.Context) {
 	tenantID := c.Query("tenant_id")
-	var planDetail PlanDetail
-	if err := c.ShouldBindJSON(&planDetail); err != nil {
+	var planDetailJSON PlanDetailJSON
+	if err := c.ShouldBindJSON(&planDetailJSON); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
+	planDetail, err := planDetailJSON.ToPlanDetail()
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid date format"})
+		return
+	}
 	planDetail.TenantID = uint(parsedTenantID)
 
 	plans := make(chan model.Plan)
