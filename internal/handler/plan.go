@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/Slinet6056/road-patrol-backend/internal/config"
 	"github.com/Slinet6056/road-patrol-backend/internal/model"
@@ -13,6 +14,29 @@ import (
 type PlanDetail struct {
 	model.Plan
 	RoadIDs []uint `json:"road_ids"`
+}
+
+type PlanDetailJSON struct {
+	RoadIDs     []uint `json:"road_ids"`
+	InspectorID uint   `json:"inspector_id"`
+	Date        string `json:"date"`
+	Status      string `json:"status"`
+}
+
+func (p *PlanDetailJSON) ToPlanDetail() (PlanDetail, error) {
+	date, err := time.Parse("2006-01-02", p.Date)
+	if err != nil {
+		return PlanDetail{}, err
+	}
+
+	return PlanDetail{
+		Plan: model.Plan{
+			InspectorID: p.InspectorID,
+			Date:        date,
+			Status:      p.Status,
+		},
+		RoadIDs: p.RoadIDs,
+	}, nil
 }
 
 // GetPlans 获取所有巡检任务及其关联的道路ID
@@ -98,13 +122,18 @@ func AddPlan(c *gin.Context) {
 // UpdatePlan 更新巡检任务及其关联的道路
 func UpdatePlan(c *gin.Context) {
 	tenantID := c.Query("tenant_id")
-	var planDetail PlanDetail
+	var planDetailJSON PlanDetailJSON
 	id := c.Param("id")
-	if err := c.ShouldBindJSON(&planDetail); err != nil {
+	if err := c.ShouldBindJSON(&planDetailJSON); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 	parsedTenantID, _ := strconv.ParseUint(tenantID, 10, 64)
+	planDetail, err := planDetailJSON.ToPlanDetail()
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid date format"})
+		return
+	}
 	planDetail.TenantID = uint(parsedTenantID)
 
 	planChan := make(chan model.Plan)
@@ -129,11 +158,18 @@ func UpdatePlan(c *gin.Context) {
 		result = config.DB.Where("tenant_id = ?", tenantID).Model(&model.Plan{}).Where("id = ?", id).Updates(planDetail.Plan)
 		config.DbMutex.Unlock()
 
+		// 将 id 从 string 转换为 uint
+		parsedID, err := strconv.ParseUint(id, 10, 64)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid ID format"})
+			return
+		}
+
 		// 更新 PlanRoad 表
 		config.DbMutex.Lock()
 		config.DB.Where("plan_id = ?", id).Delete(&model.PlanRoad{})
 		for _, roadID := range planDetail.RoadIDs {
-			config.DB.Create(&model.PlanRoad{PlanID: planDetail.ID, RoadID: roadID})
+			config.DB.Create(&model.PlanRoad{PlanID: uint(parsedID), RoadID: roadID})
 		}
 		config.DbMutex.Unlock()
 
