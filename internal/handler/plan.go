@@ -62,7 +62,7 @@ func GetPlans(c *gin.Context) {
 		for _, plan := range plans {
 			var roadIDs []uint
 			config.DbMutex.Lock()
-			config.DB.Model(&model.PlanRoad{}).Where("plan_id = ?", plan.ID).Pluck("road_id", &roadIDs)
+			config.DB.Where("tenant_id = ?", tenantID).Model(&model.PlanRoad{}).Where("plan_id = ?", plan.ID).Pluck("road_id", &roadIDs)
 			config.DbMutex.Unlock()
 
 			planDetails = append(planDetails, PlanDetail{Plan: plan, RoadIDs: roadIDs})
@@ -104,7 +104,7 @@ func AddPlan(c *gin.Context) {
 
 		for _, roadID := range planDetail.RoadIDs {
 			config.DbMutex.Lock()
-			config.DB.Create(&model.PlanRoad{PlanID: planDetail.ID, RoadID: roadID})
+			config.DB.Create(&model.PlanRoad{TenantID: planDetail.TenantID, PlanID: planDetail.ID, RoadID: roadID})
 			config.DbMutex.Unlock()
 		}
 
@@ -167,9 +167,9 @@ func UpdatePlan(c *gin.Context) {
 
 		// 更新 PlanRoad 表
 		config.DbMutex.Lock()
-		config.DB.Where("plan_id = ?", id).Delete(&model.PlanRoad{})
+		config.DB.Where("plan_id = ? AND tenant_id = ?", id, tenantID).Delete(&model.PlanRoad{})
 		for _, roadID := range planDetail.RoadIDs {
-			config.DB.Create(&model.PlanRoad{PlanID: uint(parsedID), RoadID: roadID})
+			config.DB.Create(&model.PlanRoad{TenantID: planDetail.TenantID, PlanID: uint(parsedID), RoadID: roadID})
 		}
 		config.DbMutex.Unlock()
 
@@ -214,7 +214,7 @@ func DeletePlan(c *gin.Context) {
 	go func() {
 		config.DbMutex.Lock()
 		// 先删除 PlanRoad 表中的关联数据
-		config.DB.Where("plan_id = ?", id).Delete(&model.PlanRoad{})
+		config.DB.Where("plan_id = ? AND tenant_id = ?", id, tenantID).Delete(&model.PlanRoad{})
 		// 再删除 Plan 表中的数据
 		result := config.DB.Where("tenant_id = ?", tenantID).Delete(&model.Plan{}, id)
 		config.DbMutex.Unlock()
