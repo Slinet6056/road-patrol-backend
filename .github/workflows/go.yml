@@ -21,8 +21,11 @@ jobs:
       with:
         go-version: '1.22.2'
 
-    - name: Build
-      run: go build -v ./...
+    - name: Build executable
+      run: go build -o roadpatrol ./...
 
-    - name: Test
-      run: go test -v ./...
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: roadpatrol
+        path: ./roadpatrol
