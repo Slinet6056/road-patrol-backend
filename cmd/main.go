@@ -32,7 +32,6 @@ func main() {
 		authorizedAdmin.PUT("/road/:id", handler.UpdateRoad)
 		authorizedAdmin.DELETE("/road/:id", handler.DeleteRoad)
 
-		authorizedAdmin.GET("/users", handler.GetUsers)
 		authorizedAdmin.POST("/user", handler.AddUser)
 		authorizedAdmin.PUT("/user/:id", handler.UpdateUser)
 		authorizedAdmin.DELETE("/user/:id", handler.DeleteUser)
@@ -42,6 +41,7 @@ func main() {
 	authorizedInspector.Use(middleware.JWTAuth([]string{"admin", "inspector"}))
 	{
 		authorizedInspector.GET("/roads", handler.GetRoads)
+		authorizedInspector.GET("/users", handler.GetUsers)
 
 		authorizedInspector.GET("/plans", handler.GetPlans)
 		authorizedInspector.POST("/plan", handler.AddPlan)
