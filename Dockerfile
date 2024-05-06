@@ -11,16 +11,16 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # 复制源代码到容器中
-COPY pkg .
+COPY . .
 
 # 构建应用程序
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o roadpatrol ./cmd
 
 # 使用scratch作为运行环境
 FROM scratch
 
 # 从builder镜像中复制构建的可执行文件
-COPY --from=builder /app/main .
+COPY --from=builder /app/roadpatrol .
 
 # 运行应用程序
-ENTRYPOINT ["./main"]
+ENTRYPOINT ["./roadpatrol"]
