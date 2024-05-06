@@ -26,13 +26,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	tenantID := c.Query("tenant_id")
+
 	userChan := make(chan model.User)
 	errChan := make(chan error)
 
 	go func() {
 		var user model.User
 		config.DbMutex.Lock()
-		result := config.DB.Where("username = ? AND password = ?", loginParams.Username, loginParams.Password).First(&user)
+		result := config.DB.Where("tenant_id = ? AND username = ? AND password = ?", tenantID, loginParams.Username, loginParams.Password).First(&user)
 		config.DbMutex.Unlock()
 		if result.Error != nil {
 			errChan <- result.Error
